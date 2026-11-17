@@ -20,8 +20,8 @@ class GeminiError(Exception):
 
 def generation_models() -> list[str]:
     """Main model first, then fallbacks tried when a model is unavailable or rate-limited."""
-    main = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
-    fallbacks = os.environ.get("GEMINI_FALLBACK_MODELS", "gemini-3.5-flash-lite")
+    main = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
+    fallbacks = os.environ.get("GEMINI_FALLBACK_MODELS", "gemini-3.8-flash")
     return list(dict.fromkeys([main] + [m.strip() for m in fallbacks.split(",") if m.strip()]))
 
 
@@ -41,17 +41,17 @@ def _post(path: str, body: dict, timeout: float) -> dict:
             timeout=timeout,
         )
     except requests.RequestException as exc:
-        raise GeminiError(f"network error: {exc.__class__.__name__}") from exc
+        raise GeminiError(f"network error: {exc.__class__.__name__}", status=None) from exc
     if response.status_code != 200:
         raise GeminiError(f"HTTP {response.status_code}: {response.text[:300]}", response.status_code)
     return response.json()
 
 
-def generate_json(system: str, prompt: str, timeout: float = 20) -> dict:
+def generate_json(system: str, prompt: str, timeout: float = 15) -> dict:
     """Ask the model for a JSON object and return it parsed.
 
     Tries each model of generation_models() in turn when one is not found, not
-    allowed, rate-limited or overloaded (HTTP 403, 404, 429 or 5xx).
+    allowed, rate-limited, overloaded (HTTP 403, 404, 429 or 5xx) or times out.
     """
     error: GeminiError | None = None
     for model in generation_models():
@@ -59,7 +59,7 @@ def generate_json(system: str, prompt: str, timeout: float = 20) -> dict:
             return _generate_json(model, system, prompt, timeout)
         except GeminiError as exc:
             error = exc
-            if exc.status not in RETRY_WITH_NEXT_MODEL:
+            if exc.status is not None and exc.status not in RETRY_WITH_NEXT_MODEL:
                 break
     raise error or GeminiError("no model configured")
 
