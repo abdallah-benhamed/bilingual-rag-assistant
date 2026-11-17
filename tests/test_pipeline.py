@@ -99,7 +99,7 @@ def test_generation_falls_back_to_the_next_model(monkeypatch):
     def fake_post(path, body, timeout):
         calls.append(path)
         if path.startswith("retired-model"):
-            raise gemini.GeminiError("HTTP 404: no longer available", 404)
+            raise gemini.GeminiError("HTTP 503: high demand", 503)
         return {"candidates": [{"content": {"parts": [{"text": '{"status": "not_found"}'}]}}]}
 
     monkeypatch.setattr(gemini, "_post", fake_post)
