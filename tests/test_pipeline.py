@@ -88,3 +88,34 @@ def test_hybrid_retrieval_uses_embeddings_when_available(monkeypatch):
     assert mode == "hybrid"
     assert retrieved[0].chunk.id == target and retrieved[0].similarity == 1.0
     monkeypatch.setattr(pipeline, "_doc_vectors", None)
+
+
+def test_generation_falls_back_to_the_next_model(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setenv("GEMINI_MODEL", "retired-model")
+    monkeypatch.setenv("GEMINI_FALLBACK_MODELS", "working-model")
+    calls = []
+
+    def fake_post(path, body, timeout):
+        calls.append(path)
+        if path.startswith("retired-model"):
+            raise gemini.GeminiError("HTTP 404: no longer available", 404)
+        return {"candidates": [{"content": {"parts": [{"text": '{"status": "not_found"}'}]}}]}
+
+    monkeypatch.setattr(gemini, "_post", fake_post)
+    assert gemini.generate_json("system", "prompt") == {"status": "not_found"}
+    assert calls == ["retired-model:generateContent", "working-model:generateContent"]
+
+
+def test_generation_does_not_retry_on_other_errors(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    calls = []
+
+    def fake_post(path, body, timeout):
+        calls.append(path)
+        raise gemini.GeminiError("HTTP 400: bad request", 400)
+
+    monkeypatch.setattr(gemini, "_post", fake_post)
+    with pytest.raises(gemini.GeminiError):
+        gemini.generate_json("system", "prompt")
+    assert len(calls) == 1

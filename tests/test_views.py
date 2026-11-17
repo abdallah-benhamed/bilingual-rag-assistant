@@ -49,3 +49,9 @@ def test_rate_limit(client, settings):
     settings.CHAT_MESSAGES_PER_HOUR = 2
     codes = [post(client, "/api/chat/", {"message": "delivery fee"}).status_code for _ in range(3)]
     assert codes == [200, 200, 429]
+
+
+def test_stale_session_cookie_after_database_reset(client):
+    client.cookies["sessionid"] = "a" * 32  # points to a session that does not exist
+    response = post(client, "/api/chat/", {"message": "How much does delivery cost?"})
+    assert response.status_code == 200
