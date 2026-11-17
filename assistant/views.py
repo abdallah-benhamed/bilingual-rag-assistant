@@ -32,9 +32,11 @@ def _json_body(request) -> dict:
 
 
 def _conversation(request) -> Conversation:
+    # Read the session first: a cookie pointing to a session that no longer exists
+    # (for example after the database was reset) leaves session_key empty once loaded.
+    conversation_id = request.session.get("conversation_id")
     if not request.session.session_key:
         request.session.save()
-    conversation_id = request.session.get("conversation_id")
     conversation = Conversation.objects.filter(id=conversation_id).first() if conversation_id else None
     if conversation is None:
         conversation = Conversation.objects.create(session_key=request.session.session_key)

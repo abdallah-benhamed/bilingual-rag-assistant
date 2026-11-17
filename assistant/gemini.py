@@ -10,7 +10,16 @@ BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
 
 class GeminiError(Exception):
-    pass
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
+
+
+def generation_models() -> list[str]:
+    """Main model first, then fallbacks tried when a model is unavailable or rate-limited."""
+    main = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
+    fallbacks = os.environ.get("GEMINI_FALLBACK_MODELS", "gemini-3.5-flash-lite")
+    return list(dict.fromkeys([main] + [m.strip() for m in fallbacks.split(",") if m.strip()]))
 
 
 def api_key() -> str | None:
@@ -31,13 +40,28 @@ def _post(path: str, body: dict, timeout: float) -> dict:
     except requests.RequestException as exc:
         raise GeminiError(f"network error: {exc.__class__.__name__}") from exc
     if response.status_code != 200:
-        raise GeminiError(f"HTTP {response.status_code}: {response.text[:200]}")
+        raise GeminiError(f"HTTP {response.status_code}: {response.text[:300]}", response.status_code)
     return response.json()
 
 
 def generate_json(system: str, prompt: str, timeout: float = 30) -> dict:
-    """Ask the model for a JSON object and return it parsed."""
-    model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+    """Ask the model for a JSON object and return it parsed.
+
+    Tries each model of generation_models() in turn when one is not found,
+    not allowed or rate-limited (HTTP 403, 404 or 429).
+    """
+    error: GeminiError | None = None
+    for model in generation_models():
+        try:
+            return _generate_json(model, system, prompt, timeout)
+        except GeminiError as exc:
+            error = exc
+            if exc.status not in (403, 404, 429):
+                break
+    raise error or GeminiError("no model configured")
+
+
+def _generate_json(model: str, system: str, prompt: str, timeout: float) -> dict:
     data = _post(
         f"{model}:generateContent",
         {
