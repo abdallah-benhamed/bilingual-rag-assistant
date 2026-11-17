@@ -13,6 +13,7 @@ best matching section word for word, with its citation.
 """
 from __future__ import annotations
 
+import logging
 import math
 import os
 import re
@@ -22,6 +23,8 @@ from dataclasses import asdict, dataclass, field
 
 from . import gemini
 from .retrieval import Chunk, detect_language, load_indexes
+
+logger = logging.getLogger(__name__)
 
 TOP_K = 4
 MIN_BM25 = float(os.environ.get("MIN_BM25_SCORE", "1.5"))
@@ -135,7 +138,8 @@ def retrieve(question: str, lang: str) -> tuple[list[Retrieved], str]:
             query_vector = gemini.embed([question], "RETRIEVAL_QUERY")[0]
             similarity = {c.id: _cosine(query_vector, v) for c, v in zip(index.chunks, doc_vectors)}
             mode = "hybrid"
-        except gemini.GeminiError:
+        except gemini.GeminiError as exc:
+            logger.warning("Embedding failed, using keyword search only: %s", exc)
             similarity = {}
     rank_bm25, rank_sim = _ranks(bm25), _ranks(similarity)
     fused = {}
@@ -203,9 +207,9 @@ def _answer(question: str) -> Result:
             SYSTEM_PROMPT.format(language=language),
             f"Sources:\n{sources_text}\n\nCustomer question:\n{question}",
         )
-    except gemini.GeminiError:
-        best = max(retrieved, key=lambda r: r.bm25 + r.similarity).chunk
-        return _extractive(best, lang, retrieval, scores, reason="model_unavailable")
+    except gemini.GeminiError as exc:
+        logger.warning("Gemini generation failed, answering extractively: %s", exc)
+        return _extractive(retrieved[0].chunk, lang, retrieval, scores, reason="model_unavailable")
 
     status = str(data.get("status", "")).strip()
     text = str(data.get("answer", "")).strip()

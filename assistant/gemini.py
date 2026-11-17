@@ -48,10 +48,15 @@ def generate_json(system: str, prompt: str, timeout: float = 30) -> dict:
         timeout,
     )
     try:
-        text = data["candidates"][0]["content"]["parts"][0]["text"]
+        candidate = data["candidates"][0]
+        parts = candidate.get("content", {}).get("parts", [])
+        text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
+        if text.startswith("```"):
+            text = text.strip("`").removeprefix("json").strip()
         return json.loads(text)
-    except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
-        raise GeminiError("unexpected model response") from exc
+    except (KeyError, IndexError, TypeError, AttributeError, json.JSONDecodeError) as exc:
+        reason = data.get("candidates", [{}])[0].get("finishReason") if isinstance(data, dict) else None
+        raise GeminiError(f"unexpected model response (finishReason={reason})") from exc
 
 
 def embed(texts: list[str], task_type: str, timeout: float = 30) -> list[list[float]]:
