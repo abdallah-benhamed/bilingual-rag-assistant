@@ -2,7 +2,7 @@
 
 A customer-support assistant for a fictional delivery company in southern Tunisia. It answers in English or Arabic, only from the company's documents, cites the section it used, and hands the customer to a person when it is not sure. Every message, source and handoff is logged in the Django admin.
 
-**Live demo:** _add your Render link here_
+**Live demo:** https://bilingual-rag-assistant.onrender.com (free hosting: the first visit after a quiet period takes up to a minute to wake up)
 
 ## What it shows
 
