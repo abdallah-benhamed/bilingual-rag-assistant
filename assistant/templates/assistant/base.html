@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Nakhla Delivery assistant (demo){% endblock %}</title>
+  <style>
+    :root {
+      --ink: #1d2521; --muted: #5d6b64; --line: #dde5e0; --bg: #f5f7f4; --card: #ffffff;
+      --brand: #1f6f50; --brand-ink: #ffffff; --brand-soft: #e3f1ea; --warn-soft: #fff4dc; --warn-ink: #7a5300;
+      --radius: 14px;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Arabic", "Geeza Pro", Tahoma, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.5; }
+    a { color: var(--brand); }
+    header.site { background: var(--card); border-bottom: 1px solid var(--line); }
+    header.site .wrap { display: flex; align-items: center; gap: 12px; padding: 14px 20px; }
+    .logo { width: 34px; height: 34px; border-radius: 9px; background: var(--brand); color: var(--brand-ink);
+            display: grid; place-items: center; font-weight: 700; }
+    .brand { font-weight: 650; }
+    .badge { font-size: 12px; background: var(--warn-soft); color: var(--warn-ink); padding: 2px 8px; border-radius: 99px; }
+    nav { margin-inline-start: auto; display: flex; gap: 16px; font-size: 14px; }
+    .wrap { max-width: 1040px; margin: 0 auto; }
+    main { padding: 20px; }
+    footer { color: var(--muted); font-size: 13px; text-align: center; padding: 24px 20px 32px; }
+    [dir="rtl"], .ar { font-family: "Noto Naskh Arabic", "Noto Sans Arabic", "Geeza Pro", Tahoma, var(--font, sans-serif); }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="site">
+    <div class="wrap">
+      <div class="logo" aria-hidden="true">N</div>
+      <div><span class="brand">Nakhla Delivery assistant</span> <span class="badge">Demo</span></div>
+      <nav><a href="{% url 'index' %}">Chat</a><a href="{% url 'kb_index' %}">Knowledge base</a></nav>
+    </div>
+  </header>
+  <main class="wrap">{% block content %}{% endblock %}</main>
+  <footer>Demo with fictional company data · Built with Django, hybrid search and Google Gemini · Abdallah Ben Hamed</footer>
+</body>
+</html>

@@ -1,0 +1,156 @@
+{% extends "assistant/base.html" %}
+{% block head %}
+<style>
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+  .chat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); display: flex;
+          flex-direction: column; height: min(72vh, 680px); }
+  .messages { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .msg { max-width: 82%; padding: 10px 14px; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .msg.user { align-self: flex-end; background: var(--brand); color: var(--brand-ink); border-end-end-radius: 4px; }
+  .msg.bot { align-self: flex-start; background: #f0f3f1; border-end-start-radius: 4px; }
+  .msg.bot.handoff { background: var(--warn-soft); }
+  .sources { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .source { font-size: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 99px;
+            padding: 2px 9px; text-decoration: none; color: var(--ink); }
+  .meta { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .handoff-form { display: grid; gap: 6px; margin-top: 10px; white-space: normal; }
+  .handoff-form input { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+  .composer { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+  .composer textarea { flex: 1; resize: none; height: 46px; padding: 11px 12px; border: 1px solid var(--line);
+                       border-radius: 10px; font: inherit; }
+  button { background: var(--brand); color: var(--brand-ink); border: 0; border-radius: 10px; padding: 0 18px;
+           font: inherit; font-weight: 600; cursor: pointer; min-height: 40px; }
+  button:disabled { opacity: .55; cursor: default; }
+  .samples[hidden] { display: none; }
+  .samples { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 18px 14px; }
+  .sample { background: var(--brand-soft); color: var(--brand); padding: 6px 11px; min-height: 0; font-weight: 500;
+            font-size: 13px; border-radius: 99px; }
+  aside { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; font-size: 14px; }
+  aside h2 { font-size: 15px; margin: 0 0 8px; }
+  aside ol { padding-inline-start: 18px; margin: 0 0 12px; }
+  aside li { margin-bottom: 6px; }
+  .typing { color: var(--muted); font-size: 13px; padding: 0 18px 8px; min-height: 20px; }
+</style>
+{% endblock %}
+{% block content %}
+{% csrf_token %}
+<div class="layout">
+  <section class="chat" aria-label="Chat with the assistant">
+    <div class="messages" id="messages" aria-live="polite">
+      <div class="msg bot" dir="ltr">Hi! Ask me about deliveries, prices, refunds or business accounts, in English or Arabic.</div>
+      <div class="msg bot" dir="rtl">مرحبًا! اسألني عن التوصيل والأسعار والاسترجاع وحسابات المؤسسات، بالعربية أو بالإنجليزية.</div>
+    </div>
+    <div class="samples">
+      {% for q in samples %}<button type="button" class="sample" dir="auto">{{ q }}</button>{% endfor %}
+    </div>
+    <div class="typing" id="typing"></div>
+    <form class="composer" id="composer">
+      <textarea id="input" dir="auto" maxlength="500" placeholder="Type your question… اكتب سؤالك…" aria-label="Your question"></textarea>
+      <button id="send" type="submit">Send</button>
+    </form>
+  </section>
+  <aside>
+    <h2>How it works</h2>
+    <ol>
+      <li>Your question is matched against the company's documents with hybrid search (keywords and Gemini embeddings), in the language you wrote in.</li>
+      <li>If nothing relevant is found, the assistant does not call the model: it offers a person instead.</li>
+      <li>Gemini answers only from the matching sections and must cite them; an answer without a valid citation is discarded.</li>
+      <li>Every message, source and handoff is logged in the admin.</li>
+    </ol>
+    <p>Check any answer against its source in the <a href="{% url 'kb_index' %}">knowledge base</a>.</p>
+  </aside>
+</div>
+<script>
+(() => {
+  const csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
+  const list = document.getElementById("messages");
+  const input = document.getElementById("input");
+  const send = document.getElementById("send");
+  const typing = document.getElementById("typing");
+
+  const post = (url, body) => fetch(url, {
+    method: "POST",
+    headers: {"Content-Type": "application/json", "X-CSRFToken": csrf},
+    body: JSON.stringify(body),
+  }).then(async r => ({ok: r.ok, data: await r.json().catch(() => ({}))}));
+
+  function bubble(cls, text) {
+    const div = document.createElement("div");
+    div.className = "msg " + cls;
+    div.dir = "auto";
+    div.textContent = text;
+    list.appendChild(div);
+    list.scrollTop = list.scrollHeight;
+    return div;
+  }
+
+  function handoffForm(container, lang) {
+    const ar = lang === "ar";
+    const form = document.createElement("form");
+    form.className = "handoff-form";
+    form.dir = ar ? "rtl" : "ltr";
+    form.innerHTML = `
+      <input name="name" required maxlength="100" placeholder="${ar ? "الاسم" : "Your name"}">
+      <input name="contact" required maxlength="150" placeholder="${ar ? "الهاتف أو البريد الإلكتروني" : "Phone or email"}">
+      <button type="submit">${ar ? "أرسل" : "Send to the team"}</button>`;
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+      const btn = form.querySelector("button");
+      btn.disabled = true;
+      const res = await post("{% url 'api_handoff' %}", {name: form.name.value, contact: form.contact.value});
+      form.replaceWith(Object.assign(document.createElement("div"), {
+        className: "meta",
+        textContent: res.ok ? (ar ? "شكرًا، سيتواصل معك أحد أعضاء الفريق." : "Thanks, a team member will contact you.")
+                            : (res.data.error || "Something went wrong."),
+      }));
+    });
+    container.appendChild(form);
+  }
+
+  async function ask(text) {
+    text = text.trim();
+    if (!text) return;
+    document.querySelector(".samples").hidden = true;
+    bubble("user", text);
+    input.value = "";
+    send.disabled = true;
+    typing.textContent = "…";
+    try {
+      const res = await post("{% url 'api_chat' %}", {message: text});
+      if (!res.ok) { bubble("bot handoff", res.data.error || "Something went wrong."); return; }
+      const d = res.data;
+      const div = bubble("bot" + (d.handoff ? " handoff" : ""), d.answer);
+      if (d.sources && d.sources.length) {
+        const wrap = document.createElement("div");
+        wrap.className = "sources";
+        for (const s of d.sources) {
+          const a = document.createElement("a");
+          a.className = "source"; a.href = s.url; a.target = "_blank"; a.rel = "noopener"; a.dir = "auto";
+          a.textContent = `${s.label} · ${s.title} › ${s.section}`;
+          wrap.appendChild(a);
+        }
+        div.appendChild(wrap);
+      }
+      const meta = document.createElement("div");
+      meta.className = "meta"; meta.dir = "ltr";
+      meta.textContent = [d.mode, d.retrieval !== "none" ? d.retrieval + " search" : "", d.reason, d.latency_ms + " ms"]
+        .filter(Boolean).join(" · ");
+      div.appendChild(meta);
+      if (d.handoff) handoffForm(div, d.lang);
+      list.scrollTop = list.scrollHeight;
+    } catch (e) {
+      bubble("bot handoff", "Network error. Please try again.");
+    } finally {
+      send.disabled = false; typing.textContent = ""; input.focus();
+    }
+  }
+
+  document.getElementById("composer").addEventListener("submit", e => { e.preventDefault(); ask(input.value); });
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(input.value); }
+  });
+  document.querySelectorAll(".sample").forEach(b => b.addEventListener("click", () => ask(b.textContent)));
+})();
+</script>
+{% endblock %}

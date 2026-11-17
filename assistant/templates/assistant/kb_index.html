@@ -1,0 +1,25 @@
+{% extends "assistant/base.html" %}
+{% block title %}Knowledge base · Nakhla Delivery (demo){% endblock %}
+{% block content %}
+<style>
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+  .card h2 { font-size: 16px; margin: 0 0 10px; }
+  .card ul { margin: 0; padding-inline-start: 18px; }
+  .card li { margin-bottom: 6px; }
+</style>
+<h1 style="font-size:22px">Knowledge base</h1>
+<p>The assistant answers only from these documents. The company and its data are fictional.</p>
+<div class="grid">
+  {% for lang, docs in documents.items %}
+  <div class="card" {% if lang == "ar" %}dir="rtl"{% endif %}>
+    <h2>{% if lang == "ar" %}العربية{% else %}English{% endif %}</h2>
+    <ul>
+      {% for doc, chunks in docs.items %}
+      <li><a href="{% url 'kb_doc' lang doc %}">{{ chunks.0.doc_title }}</a> ({{ chunks|length }} sections)</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

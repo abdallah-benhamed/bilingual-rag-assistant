@@ -1,0 +1,18 @@
+{% extends "assistant/base.html" %}
+{% block title %}{{ title }} · Nakhla Delivery (demo){% endblock %}
+{% block content %}
+<style>
+  article { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px 26px; max-width: 760px; }
+  article h1 { font-size: 22px; margin-top: 0; }
+  article h2 { font-size: 17px; margin: 22px 0 6px; scroll-margin-top: 16px; }
+  article h2:target { background: var(--warn-soft); border-radius: 6px; padding: 2px 6px; }
+</style>
+<p><a href="{% url 'kb_index' %}">← Knowledge base</a></p>
+<article {% if rtl %}dir="rtl"{% endif %}>
+  <h1>{{ title }}</h1>
+  {% for chunk in chunks %}
+  <h2 id="{{ chunk.anchor }}">{{ chunk.section }}</h2>
+  <p>{{ chunk.text }}</p>
+  {% endfor %}
+</article>
+{% endblock %}
