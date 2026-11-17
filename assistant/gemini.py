@@ -9,6 +9,9 @@ import requests
 BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
 
+RETRY_WITH_NEXT_MODEL = {403, 404, 429, 500, 502, 503, 504}
+
+
 class GeminiError(Exception):
     def __init__(self, message: str, status: int | None = None):
         super().__init__(message)
@@ -44,11 +47,11 @@ def _post(path: str, body: dict, timeout: float) -> dict:
     return response.json()
 
 
-def generate_json(system: str, prompt: str, timeout: float = 30) -> dict:
+def generate_json(system: str, prompt: str, timeout: float = 20) -> dict:
     """Ask the model for a JSON object and return it parsed.
 
-    Tries each model of generation_models() in turn when one is not found,
-    not allowed or rate-limited (HTTP 403, 404 or 429).
+    Tries each model of generation_models() in turn when one is not found, not
+    allowed, rate-limited or overloaded (HTTP 403, 404, 429 or 5xx).
     """
     error: GeminiError | None = None
     for model in generation_models():
@@ -56,7 +59,7 @@ def generate_json(system: str, prompt: str, timeout: float = 30) -> dict:
             return _generate_json(model, system, prompt, timeout)
         except GeminiError as exc:
             error = exc
-            if exc.status not in (403, 404, 429):
+            if exc.status not in RETRY_WITH_NEXT_MODEL:
                 break
     raise error or GeminiError("no model configured")
 
