@@ -74,6 +74,6 @@ Replace the Markdown files in `assistant/kb/en` and `assistant/kb/ar` (same file
 
 ## Configuration
 
-See `.env.example`. Main settings: `GEMINI_MODEL` (default `gemini-3.8-flash`, with `GEMINI_FALLBACK_MODELS` tried if it is unavailable or rate-limited), `MIN_BM25_SCORE` and `MIN_EMBED_SIMILARITY` (thresholds before the model is called), `CHAT_MESSAGES_PER_HOUR`, `HANDOFF_EMAIL`.
+See `.env.example`. Main settings: `GEMINI_MODEL` (default `gemini-3.5-flash-lite`, with `GEMINI_FALLBACK_MODELS`, default `gemini-3.8-flash`, tried if it is unavailable, overloaded or slow), `MIN_BM25_SCORE` and `MIN_EMBED_SIMILARITY` (thresholds before the model is called), `CHAT_MESSAGES_PER_HOUR`, `HANDOFF_EMAIL`.
 
 Note: on Gemini's free tier, Google may use prompts to improve its products. Use a paid key before loading real customer data.
