@@ -1,0 +1,22 @@
+# Render Blueprint: New > Blueprint, pick this repository, then fill in the secret values.
+services:
+  - type: web
+    name: bilingual-rag-assistant
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: bash start.sh
+    healthCheckPath: /health/
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: DJANGO_SUPERUSER_USERNAME
+        value: admin
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false
+      - key: WEB_CONCURRENCY
+        value: "1"
