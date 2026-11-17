@@ -119,3 +119,17 @@ def test_generation_does_not_retry_on_other_errors(monkeypatch):
     with pytest.raises(gemini.GeminiError):
         gemini.generate_json("system", "prompt")
     assert len(calls) == 1
+
+
+def test_generation_falls_back_on_timeout(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setenv("GEMINI_MODEL", "slow-model")
+    monkeypatch.setenv("GEMINI_FALLBACK_MODELS", "fast-model")
+
+    def fake_post(path, body, timeout):
+        if path.startswith("slow-model"):
+            raise gemini.GeminiError("network error: ReadTimeout")
+        return {"candidates": [{"content": {"parts": [{"text": '{"status": "not_found"}'}]}}]}
+
+    monkeypatch.setattr(gemini, "_post", fake_post)
+    assert gemini.generate_json("system", "prompt") == {"status": "not_found"}
